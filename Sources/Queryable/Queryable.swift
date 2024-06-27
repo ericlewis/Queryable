@@ -28,18 +28,18 @@ import Combine
 /// An example use case would be a boolean coming from a confirmation dialog view. First, create a property of the desired data type:
 ///
 /// ```swift
-/// @StateObject var deletionConfirmation = Queryable<String, Bool>()
+/// @State var deletionConfirmation = Queryable<String, Bool>()
 /// ```
 ///
 /// Alternatively, you can put the queryable instance in any class that your view has access to:
 ///
 /// ```swift
-/// class SomeObservableObject: ObservableObject {
-///   let deletionConfirmation = Queryable<String, Bool>()
+/// @Observable class SomeObservableObject {
+///   var deletionConfirmation = Queryable<String, Bool>()
 /// }
 ///
 /// struct MyView: View {
-///   @StateObject private var someObservableObject = SomeObservableObject()
+///   @State private var someObservableObject = SomeObservableObject()
 /// }
 /// ```
 ///
@@ -73,12 +73,12 @@ import Combine
 ///
 /// When the Task that calls ``Queryable/Queryable/query(with:)`` is cancelled, the suspended query will also cancel and deactivate (i.e. close) the wrapped navigation presentation.
 /// In that case, a ``Queryable/QueryCancellationError`` error is thrown.
-@MainActor public final class Queryable<Input, Result>: ObservableObject where Input: Sendable, Result: Sendable {
+@Observable @MainActor public final class Queryable<Input, Result> where Input: Sendable, Result: Sendable {
     let queryConflictPolicy: QueryConflictPolicy
     var storedContinuationState: ContinuationState?
 
     /// Optional item storing the input value for a query and is used to indicate if the query has started, which usually coincides with a presentation being shown.
-    @Published var itemContainer: ItemContainer?
+    var itemContainer: ItemContainer?
 
     public init(queryConflictPolicy: QueryConflictPolicy = .cancelNewQuery) {
         self.queryConflictPolicy = queryConflictPolicy
@@ -108,8 +108,8 @@ import Combine
 
     /// Cancels any ongoing queries.
     public func cancel() {
-        objectWillChange.send()
         itemContainer?.resolver.answer(throwing: QueryCancellationError())
+        itemContainer = nil
     }
 
     /// A flag indicating if a query is active.
@@ -127,16 +127,29 @@ import Combine
     /// - Warning: Do not implement both a manual query observation as well as a `.queryable[...]` view modifier for the same Queryable instance.
     /// This will result in unexpected behavior.
     var queryObservation: AsyncStream<QueryObservation<Input, Result>> {
-        AsyncStream(bufferingPolicy: .unbounded) { continuation in
-            let task = Task {
-                for await container in $itemContainer.values {
-                    if Task.isCancelled { return }
-                    if let container {
-                        continuation.yield(.init(queryId: container.id, input: container.item, resolver: container.resolver))
+        AsyncStream { continuation in
+            let task = Task { [weak self] in
+                guard let self = self else { return }
+                
+                @MainActor
+                func observe() async {
+                    while !Task.isCancelled {
+                        withObservationTracking {
+                            _ = self.itemContainer
+                        } onChange: {
+                            Task { @MainActor in
+                                if let container = self.itemContainer {
+                                    continuation.yield(.init(queryId: container.id, input: container.item, resolver: container.resolver))
+                                }
+                                await observe()
+                            }
+                        }
                     }
                 }
+                
+                await observe()
             }
-
+            
             continuation.onTermination = { _ in
                 task.cancel()
             }
@@ -172,7 +185,6 @@ import Combine
                 logger.warning("Cancelling previous query of »\(Result.self, privacy: .public)« to allow new query.")
                 storedContinuationState.continuation.resume(throwing: QueryCancellationError())
                 self.storedContinuationState = nil
-                objectWillChange.send()
                 self.itemContainer = nil
             case .cancelNewQuery:
                 logger.warning("Cancelling new query of »\(Result.self, privacy: .public)« because another query is ongoing.")
@@ -188,7 +200,6 @@ import Combine
         }
 
         storedContinuationState = .init(queryId: id, continuation: newContinuation)
-        objectWillChange.send()
         itemContainer = .init(queryId: id, item: item, resolver: resolver)
     }
 
@@ -204,7 +215,6 @@ import Combine
 
             storedContinuationState?.continuation.resume(throwing: QueryCancellationError())
             storedContinuationState = nil
-            objectWillChange.send()
             itemContainer = nil
         }
     }
@@ -215,7 +225,6 @@ import Combine
         guard itemContainer?.id == queryId else { return }
         storedContinuationState?.continuation.resume(returning: result)
         storedContinuationState = nil
-        objectWillChange.send()
         itemContainer = nil
     }
 
@@ -223,7 +232,6 @@ import Combine
         guard itemContainer?.id == queryId else { return }
         storedContinuationState?.continuation.resume(throwing: error)
         storedContinuationState = nil
-        objectWillChange.send()
         itemContainer = nil
     }
 }

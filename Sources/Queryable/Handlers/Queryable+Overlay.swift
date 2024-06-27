@@ -23,7 +23,7 @@
 import SwiftUI
 
 private struct OverlayModifier<Item, Result, QueryContent: View>: ViewModifier {
-    @ObservedObject private var queryable: Queryable<Item, Result>
+    private var queryable: Queryable<Item, Result>
     private var animation: Animation? = nil
     private var alignment: Alignment = .center
     private var queryContent: (_ item: Item, _ query: QueryResolver<Result>) -> QueryContent

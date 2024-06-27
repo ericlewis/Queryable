@@ -23,7 +23,7 @@
 import SwiftUI
 
 private struct SheetModifier<Item, Result, QueryContent: View>: ViewModifier {
-    @ObservedObject private var queryable: Queryable<Item, Result>
+    private var queryable: Queryable<Item, Result>
     private var onDismiss: (() -> Void)?
     private var queryContent: (_ item: Item, _ query: QueryResolver<Result>) -> QueryContent
 
@@ -38,6 +38,7 @@ private struct SheetModifier<Item, Result, QueryContent: View>: ViewModifier {
     }
 
     func body(content: Content) -> some View {
+        @Bindable var queryable = queryable
         content
             .sheet(item: $queryable.itemContainer, onDismiss: onDismiss) { initialItemContainer in
                 StableItemContainerView(itemContainer: initialItemContainer) { itemContainer in

@@ -24,7 +24,7 @@ import SwiftUI
 
 #if !os(macOS)
 private struct FullScreenCoverModifier<Item, Result, QueryContent: View>: ViewModifier {
-    @ObservedObject private var queryable: Queryable<Item, Result>
+    private var queryable: Queryable<Item, Result>
     private var onDismiss: (() -> Void)?
     private var queryContent: (_ item: Item, _ query: QueryResolver<Result>) -> QueryContent
 

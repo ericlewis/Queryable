@@ -8,7 +8,7 @@
 import SwiftUI
 
 public struct WithQuery<Item, Result, QueryContent: View>: View {
-    @ObservedObject private var queryable: Queryable<Item, Result>
+    private var queryable: Queryable<Item, Result>
     private var queryContent: (_ item: Item, _ query: QueryResolver<Result>) -> QueryContent
 
     public init(

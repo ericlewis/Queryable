@@ -42,13 +42,13 @@ private struct NilEquatableWrapper<WrappedValue>: Equatable {
 }
 
 private struct CustomActionModifier<Item, Result>: ViewModifier {
-    @ObservedObject var queryable: Queryable<Item, Result>
+    var queryable: Queryable<Item, Result>
     var action: (_ item: Item, _ query: QueryResolver<Result>) -> Void
 
     func body(content: Content) -> some View {
         content
-            .onChange(of: NilEquatableWrapper(queryable.itemContainer)) { wrapper in
-                if let itemContainer = wrapper.wrappedValue {
+            .onChange(of: NilEquatableWrapper(queryable.itemContainer)) {
+                if let itemContainer = NilEquatableWrapper(queryable.itemContainer).wrappedValue {
                     action(itemContainer.item, itemContainer.resolver)
                 }
             }
