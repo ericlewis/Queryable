@@ -39,6 +39,7 @@ private struct FullScreenCoverModifier<Item, Result, QueryContent: View>: ViewMo
     }
 
     func body(content: Content) -> some View {
+        @Bindable var queryable = queryable
         content
             .fullScreenCover(item: $queryable.itemContainer, onDismiss: onDismiss) { initialItemContainer in
                 StableItemContainerView(itemContainer: initialItemContainer) { itemContainer in
